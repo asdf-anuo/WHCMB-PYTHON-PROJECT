@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Docflow 设计系统 — 亮色预览</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #3865f4;
+  --primary-hover: #5a7ff7;
+  --primary-plain: #eef2ff;
+  --primary-border: #ccd8fe;
+  --text: #303133;
+  --text-secondary: #909399;
+  --text-placeholder: #a8abb2;
+  --surface: #ffffff;
+  --surface-alt: #f5f7fa;
+  --page-bg: #f0f2f5;
+  --border: #e4e8ef;
+  --border-light: #ebeef5;
+  --success: #36b42a;
+  --danger: #f56c6c;
+  --warning: #ff9a05;
+  --gradient: linear-gradient(108.75deg, rgba(87, 182, 255, 0.92) 0%, rgba(51, 124, 255, 0.92) 45.74%, rgba(85, 70, 255, 0.92) 98.5%);
+  --shadow-bar: 0 1px 0 rgba(0,0,0,0.04), 0 4px 24px rgba(0, 0, 0, 0.06);
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-pop: 0 12px 32px 4px rgba(0, 0, 0, 0.08);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --navbar-h: 48px;
+  --sidebar-w: 210px;
+  --toc-w: 200px;
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--text);
+  background: var(--page-bg);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* ——— Top bar ——— */
+.topbar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: var(--navbar-h);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-light);
+  box-shadow: var(--shadow-bar);
+  display: flex;
+  align-items: center;
+  padding: 0 20px 0 16px;
+  z-index: 1100;
+  gap: 12px;
+}
+.topbar-mark {
+  width: 28px; height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--gradient);
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(56, 101, 244, 0.25);
+}
+.topbar-brand { display: flex; flex-direction: column; gap: 0; line-height: 1.2; }
+.topbar-title { font-size: 14px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+.topbar-sub { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+.topbar-spacer { flex: 1; }
+.topbar-chip {
+  font-size: 11px; font-weight: 500; color: var(--primary);
+  background: var(--primary-plain);
+  border: 1px solid var(--primary-border);
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.topbar-link {
+  font-size: 12px; color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+.topbar-link:hover { color: var(--primary); background: var(--surface-alt); }
+
+/* ——— App shell ——— */
+.app-shell {
+  display: flex;
+  padding-top: var(--navbar-h);
+  min-height: 100vh;
+}
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border-light);
+  padding: 20px 0 32px;
+  position: sticky;
+  top: var(--navbar-h);
+  align-self: flex-start;
+  height: calc(100vh - var(--navbar-h));
+  overflow-y: auto;
+}
+.sidebar-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-secondary);
+  padding: 0 20px 10px;
+}
+.sidebar-nav a {
+  display: block;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.sidebar-nav a:hover { background: var(--surface-alt); color: var(--primary); }
+.sidebar-nav a.is-active {
+  background: var(--primary-plain);
+  color: var(--primary);
+  font-weight: 500;
+  border-left-color: var(--primary);
+}
+.sidebar-foot {
+  margin-top: 24px;
+  padding: 16px 20px 0;
+  border-top: 1px solid var(--border-light);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 28px 32px 64px 36px;
+}
+.main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--toc-w);
+  gap: 40px;
+  align-items: start;
+  max-width: 1180px;
+}
+@media (max-width: 960px) {
+  .app-shell { flex-direction: column; }
+  .sidebar {
+    width: 100%; height: auto; position: relative; top: 0;
+    border-right: none; border-bottom: 1px solid var(--border-light);
+    padding: 12px 0;
+  }
+  .sidebar-nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 12px; }
+  .sidebar-nav a { border-left: none; border-radius: var(--radius-sm); padding: 6px 12px; }
+  .sidebar-label, .sidebar-foot { display: none; }
+  .main-grid { grid-template-columns: 1fr; }
+  .toc { display: none; }
+}
+
+/* ——— TOC ——— */
+.toc {
+  position: sticky;
+  top: calc(var(--navbar-h) + 24px);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.toc-title {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.1em;
+  text-transform: uppercase; margin-bottom: 12px; color: var(--text-placeholder);
+}
+.toc a {
+  display: block;
+  padding: 5px 0 5px 10px;
+  border-left: 2px solid var(--border-light);
+  color: var(--text-secondary);
+  text-decoration: none;
+  line-height: 1.4;
+}
+.toc a:hover { color: var(--primary); border-left-color: var(--primary-border); }
+
+/* ——— Sections ——— */
+.section {
+  scroll-margin-top: calc(var(--navbar-h) + 16px);
+  margin-bottom: 40px;
+}
+.section:last-child { margin-bottom: 0; }
+.section-kicker {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--primary);
+  margin-bottom: 6px;
+}
+.section-title {
+  font-size: 20px; font-weight: 600; letter-spacing: -0.03em;
+  color: var(--text); margin-bottom: 8px; line-height: 1.25;
+}
+.section-lead {
+  font-size: 13px; color: var(--text-secondary);
+  max-width: 52em; margin-bottom: 20px; line-height: 1.6;
+}
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.panel-hd {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-light);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.panel-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.panel-meta { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.panel-bd { padding: 20px; }
+
+/* ——— Hero ——— */
+.hero {
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: 8px;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+}
+.hero-inner {
+  padding: 32px 28px 36px;
+  background: linear-gradient(135deg, var(--surface) 0%, var(--primary-plain) 55%, #fff 100%);
+  position: relative;
+}
+.hero-inner::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: var(--gradient);
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 500; color: var(--primary);
+  background: #fff;
+  border: 1px solid var(--primary-border);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
+.hero h1 {
+  font-size: clamp(22px, 3vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.hero p {
+  font-size: 14px;
+  color: var(--text-secondary);
+  max-width: 36em;
+  line-height: 1.65;
+}
+.hero-actions { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+/* ——— Color grid ——— */
+.color-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.color-tile {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  background: var(--surface);
+}
+.color-tile-swatch { height: 56px; }
+.color-tile-body { padding: 10px 12px; }
+.color-tile-name { font-size: 12px; font-weight: 600; color: var(--text); }
+.color-tile-hex {
+  font-size: 11px; font-family: var(--font-mono);
+  color: var(--text-secondary); margin-top: 2px;
+}
+
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+table.data th, table.data td {
+  border: 1px solid var(--border-light);
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+table.data th {
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+table.data code { font-family: var(--font-mono); font-size: 11px; color: var(--text); }
+
+/* ——— Typography scale ——— */
+.type-rows { display: flex; flex-direction: column; gap: 16px; }
+.type-row {
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  gap: 16px;
+  align-items: baseline;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+.type-row:last-child { border-bottom: 0; padding-bottom: 0; }
+.type-meta {
+  font-size: 10px; color: var(--text-secondary);
+  font-family: var(--font-mono); line-height: 1.4;
+}
+.t-display { font-size: 24px; font-weight: 600; letter-spacing: -0.03em; line-height: 1.3; }
+.t-h2 { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
+.t-body { font-size: 12px; font-weight: 400; color: var(--text); }
+.t-muted { font-size: 12px; color: var(--text-secondary); }
+
+/* ——— Spacing ——— */
+.space-strip { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.space-item { text-align: center; }
+.space-bar {
+  background: var(--primary-plain);
+  border: 1px dashed var(--primary-border);
+  border-radius: 2px;
+  margin: 0 auto 6px;
+}
+.space-label { font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono); }
+
+/* ——— Elevation ——— */
+.elev-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+.elev-box {
+  height: 72px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+}
+.elev-flat { box-shadow: none; }
+.elev-low { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.elev-mid { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.elev-high { box-shadow: 0 12px 40px rgba(0,0,0,0.1); }
+
+/* ——— Buttons ——— */
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: default;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn-primary:hover { background: var(--primary-hover); box-shadow: 0 0 0 3px rgba(56,101,244,0.18); }
+.btn-default {
+  background: var(--surface);
+  color: var(--text);
+  border-color: #dcdfe6;
+}
+.btn-default:hover { border-color: var(--primary); color: var(--primary); }
+.btn-gradient { background: var(--gradient); color: #fff; border: none; }
+.btn-gradient:hover { box-shadow: 0 0 0 3px rgba(56,101,244,0.2); }
+.btn-ghost { background: transparent; color: var(--primary); border-color: transparent; }
+.btn-ghost:hover { background: var(--primary-plain); }
+.btn-sm { padding: 5px 12px; font-size: 12px; }
+.btn-lg { padding: 10px 22px; font-size: 13px; }
+.btn[disabled] {
+  opacity: 0.55;
+  pointer-events: none;
+  border-color: var(--border) !important;
+}
+
+/* ——— Form mock ——— */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px 20px;
+}
+.field label {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.field label .req { color: var(--danger); margin-right: 2px; }
+.field input, .field select {
+  width: 100%;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid #dcdfe6;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field input:focus, .field select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(56,101,244,0.12);
+}
+.field input::placeholder { color: var(--text-placeholder); }
+.field.is-error input { border-color: var(--danger); }
+.field-hint { font-size: 11px; color: var(--danger); margin-top: 4px; }
+
+/* ——— Tags ——— */
+.tags { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag {
+  display: inline-flex; align-items: center;
+  padding: 2px 9px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.tag-primary { background: var(--primary-plain); color: var(--primary); border: 1px solid var(--primary-border); }
+.tag-success { background: #f0f9ef; color: var(--success); border: 1px solid #c3e6bd; }
+.tag-warn { background: #fff8e6; color: #b88200; border: 1px solid #ffe7a3; }
+.tag-danger { background: #fef0f0; color: #c45656; border: 1px solid #fbc4c4; }
+.tag-neutral { background: var(--surface-alt); color: var(--text-secondary); border: 1px solid var(--border-light); }
+
+/* ——— Stat cards ——— */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.stat-card {
+  padding: 18px 18px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  background: linear-gradient(180deg, #fff 0%, var(--surface-alt) 100%);
+}
+.stat-label { font-size: 11px; color: var(--text-secondary); letter-spacing: 0.04em; margin-bottom: 6px; }
+.stat-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+.stat-value.accent { color: var(--primary); }
+.stat-foot { font-size: 11px; color: var(--text-secondary); margin-top: 8px; }
+
+/* ——— 列表页：Card + Condition + el-table + k-pagination（对齐 src/views/user/index.vue） ——— */
+.common-card {
+  background: #ffffff;
+  box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.common-card__header.flex-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  margin-bottom: 16px;
+}
+.list-toolbar-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.ep-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 15px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+  cursor: default;
+  white-space: nowrap;
+}
+.ep-btn-primary {
+  background: #3865f4;
+  border-color: #3865f4;
+  color: #ffffff;
+}
+.ep-btn-default {
+  background: #ffffff;
+  border-color: #dcdfe6;
+  color: #606266;
+}
+.ep-btn .ep-caret { font-size: 10px; opacity: 0.75; margin-left: 2px; }
+.condition-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.condition-select-mock,
+.condition-input-mock {
+  height: 32px;
+  line-height: 30px;
+  padding: 0 11px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #c0c4cc;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+.condition-select-mock { width: 120px; }
+.condition-input-mock { width: 300px; }
+.docflow-table-shell {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 4px 4px 0 0;
+}
+/* 与线上 el-table 默认（未设 border）一致：仅底部分隔横线，无列竖线；色同 --el-table-border-color */
+.docflow-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px !important;
+  color: #606266;
+  font-variant-numeric: tabular-nums;
+  border: 0;
+}
+.docflow-table th {
+  background: #f5f7fa !important;
+  color: #909399 !important;
+  font-weight: 500;
+  padding: 8px 12px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid #ebeef5;
+  vertical-align: middle;
+}
+.docflow-table td {
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 1px solid #ebeef5;
+  vertical-align: middle;
+}
+.docflow-table tbody tr:nth-child(even) td { background-color: #f5f7fa; }
+.docflow-table tbody tr:nth-child(odd) td { background-color: #ffffff; }
+.docflow-table .col-cb { width: 55px; text-align: center; padding-left: 8px; padding-right: 8px; }
+.cb-mock {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #dcdfe6;
+  border-radius: 2px;
+  vertical-align: middle;
+  background: #fff;
+  box-sizing: border-box;
+}
+.cb-mock.is-on {
+  background: #3865f4;
+  border-color: #3865f4;
+  position: relative;
+}
+.cb-mock.is-on::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.switch-mock {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: #dcdfe6;
+  position: relative;
+  display: inline-block;
+  vertical-align: middle;
+}
+.switch-mock.on { background: #3865f4; }
+.switch-mock::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.switch-mock.on::after { left: 18px; }
+.status-cell { display: inline-flex; align-items: center; font-size: 12px; color: #606266; }
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 8px;
+  flex-shrink: 0;
+  background: #b1b3b8;
+}
+.status-dot.is-success { background: #36b42a; }
+.status-dot.is-cancel { background: #b1b3b8; }
+.operation-wrap {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 160px;
+}
+.el-link-mock { color: #3865f4; font-size: 12px; cursor: default; }
+.el-link-mock.is-disabled { color: #606266; opacity: 0.55; cursor: not-allowed; }
+.user-name-mock { margin-right: 6px; }
+.kdx-link-mock {
+  color: #3865f4;
+  font-size: 14px;
+  cursor: default;
+  vertical-align: middle;
+}
+.k-table-pagination {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  font-size: 12px;
+  color: #606266;
+}
+.ep-pagination-mock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ep-pagination-mock .sep { color: #dcdfe6; margin: 0 2px; user-select: none; }
+.ep-page-num {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  border-radius: 2px;
+  cursor: default;
+  color: #606266;
+}
+.ep-page-num.is-active { color: #3865f4; font-weight: 500; }
+.ep-page-arrow {
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #606266;
+  border-radius: 2px;
+  cursor: default;
+}
+.ep-select-mock {
+  height: 28px;
+  line-height: 26px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid #dcdfe6;
+  font-size: 12px;
+  color: #606266;
+  background: transparent;
+}
+
+/* ——— Tabs & breadcrumb ——— */
+.tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 16px;
+}
+.tab {
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: default;
+}
+.tab.is-active { color: var(--primary); font-weight: 500; border-bottom-color: var(--primary); }
+.breadcrumb {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+}
+.breadcrumb span { color: var(--text); }
+
+/* ——— Alert & dialog mock ——— */
+.alert {
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  display: flex; align-items: flex-start; gap: 10px;
+  margin-bottom: 10px;
+}
+.alert:last-child { margin-bottom: 0; }
+.alert-info { background: var(--primary-plain); border: 1px solid var(--primary-border); color: var(--text); }
+.alert-warn { background: #fff8e6; border: 1px solid #ffe7a3; color: #7a5c00; }
+.dialog-mock {
+  max-width: 400px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-pop);
+  background: var(--surface);
+  overflow: hidden;
+}
+.dialog-mock-hd {
+  padding: 16px 20px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #151b1e;
+  border-bottom: 1px solid var(--border-light);
+}
+.dialog-mock-bd { padding: 16px 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.dialog-mock-ft {
+  padding: 12px 20px 16px;
+  display: flex; justify-content: flex-end; gap: 10px;
+  border-top: 1px solid var(--border-light);
+  background: var(--surface-alt);
+}
+
+.muted { color: var(--text-secondary); font-size: 12px; }
+code.inline { font-family: var(--font-mono); font-size: 11px; background: var(--surface-alt); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--border-light); }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-mark" aria-hidden="true"></div>
+  <div class="topbar-brand">
+    <span class="topbar-title">Docflow</span>
+    <span class="topbar-sub">设计系统 · 亮色预览</span>
+  </div>
+  <span class="topbar-spacer"></span>
+  <span class="topbar-chip">DESIGN.md</span>
+  <a class="topbar-link" href="./preview-dark.html">暗色版</a>
+</header>
+
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-label">本页目录</div>
+    <nav class="sidebar-nav">
+      <a href="#intro">概览</a>
+      <a href="#colors">色板</a>
+      <a href="#typography">排版</a>
+      <a href="#spacing">间距</a>
+      <a href="#elevation">层级阴影</a>
+      <a href="#buttons">按钮</a>
+      <a href="#forms">表单</a>
+      <a href="#tags">标签</a>
+      <a href="#cards">指标卡</a>
+      <a href="#data">数据表</a>
+      <a href="#navigation">导航</a>
+      <a href="#feedback">反馈</a>
+      <a href="#modal">对话框</a>
+      <a href="#refs">文档</a>
+    </nav>
+    <div class="sidebar-foot">
+      侧栏宽 210px、顶栏 48px，与 <code class="inline">mixin.less</code> 方向一致。
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="main-grid">
+      <div class="main-col">
+
+        <section class="section" id="intro">
+          <div class="hero">
+            <div class="hero-inner">
+              <div class="hero-badge">Vue 3 · Element Plus · Less</div>
+              <h1>文档流程平台的界面语言</h1>
+              <p>本页为静态示意，用于对齐 <code class="inline">frontend/design/DESIGN.md</code> 与仓库内 Less 变量：主色、表头灰、表格 12px、抽屉与对话框层次等。实现代码时请优先使用 Less / CSS 变量，避免散落硬编码色值。</p>
+              <div class="hero-actions">
+                <span class="btn btn-gradient">主流程 CTA</span>
+                <span class="btn btn-default">次要操作</span>
+                <span class="btn btn-ghost">文字链式</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="colors">
+          <p class="section-kicker">01 · Color</p>
+          <h2 class="section-title">色板与语义</h2>
+          <p class="section-lead">主色由 <code class="inline">@blue</code> 注入 <code class="inline">--el-color-primary</code>；横幅渐变取自 <code class="inline">variable.less</code> 的 <code class="inline">@gradientBlueImage</code>（需在样式中显式 import）。</p>
+          <div class="panel">
+            <div class="panel-bd">
+              <div class="color-grid">
+                <div class="color-tile"><div class="color-tile-swatch" style="background:#3865f4"></div><div class="color-tile-body"><div class="color-tile-name">Primary</div><div class="color-tile-hex">#3865f4</div></div></div>
+                <div class="color-tile"><div class="color-tile-swatch" style="background:#eef2ff"></div><div class="color-tile-body"><div class="color-tile-name">Primary plain</div><div class="color-tile-hex">#eef2ff</div></div></div>
+                <div class="color-tile"><div class="color-tile-swatch" style="background:#f5f7fa"></div><div class="color-tile-body"><div class="color-tile-name">Surface alt</div><div class="color-tile-hex">#f5f7fa</div></div></div>
+                <div class="color-tile"><div class="color-tile-swatch" style="background:#ff9a05"></div><div class="color-tile-body"><div class="color-tile-name">Warning</div><div class="color-tile-hex">#ff9a05</div></div></div>
+                <div class="color-tile"><div class="color-tile-swatch" style="background:#36b42a"></div><div class="color-tile-body"><div class="color-tile-name">Success</div><div class="color-tile-hex">#36b42a</div></div></div>
+                <div class="color-tile"><div class="color-tile-swatch" style="background:var(--gradient)"></div><div class="color-tile-body"><div class="color-tile-name">Gradient</div><div class="color-tile-hex">108.75deg</div></div></div>
+              </div>
+              <table class="data">
+                <thead><tr><th>角色</th><th>变量 / Token</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr><td>主操作、链接强调</td><td><code>@blue</code> → <code>--el-color-primary</code></td><td>侧栏浅色激活文字同源</td></tr>
+                  <tr><td>表头、斑马纹行</td><td><code>@backgroundColor</code></td><td><code>element-rewrite.less</code> 中表格</td></tr>
+                  <tr><td>主内容卡片</td><td><code>@mainContentBackgroundColor</code></td><td>白底内容区</td></tr>
+                  <tr><td>页面灰底</td><td><code>reset.less</code> body</td><td><code>whitesmoke</code> 类页面背景</td></tr>
+                  <tr><td>警告语义</td><td><code>@orange</code></td><td>与 Element warning 对齐</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="typography">
+          <p class="section-kicker">02 · Typography</p>
+          <h2 class="section-title">排版层级</h2>
+          <p class="section-lead">运行态中 <code class="inline">reset.less</code> 将 Element 基础字号设为 12px，与表格覆盖一致；页面级标题可在局部放大以保持层次。</p>
+          <div class="panel">
+            <div class="panel-bd">
+              <div class="type-rows">
+                <div class="type-row"><div class="type-meta">24px / 600</div><div class="t-display">数据总览 · 空间维度</div></div>
+                <div class="type-row"><div class="type-meta">18px / 600</div><div class="t-h2">模板配置 · 字段映射</div></div>
+                <div class="type-row"><div class="type-meta">12px / 400</div><div class="t-body">列表与表单正文：私有化部署下 API 基址由环境配置，勿写死生产域名。</div></div>
+                <div class="type-row"><div class="type-meta">12px / 400</div><div class="t-muted">次要说明、表头、占位提示与元数据行。</div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="spacing">
+          <p class="section-kicker">03 · Space</p>
+          <h2 class="section-title">间距刻度</h2>
+          <p class="section-lead">以 4px 为基准刻度，与 <code class="inline">TOKENS.md</code> 一致；卡片内边距常用 16–24px，页面区块纵向 24–40px。</p>
+          <div class="panel"><div class="panel-bd">
+            <div class="space-strip">
+              <div class="space-item"><div class="space-bar" style="width:4px;height:4px"></div><div class="space-label">4</div></div>
+              <div class="space-item"><div class="space-bar" style="width:8px;height:8px"></div><div class="space-label">8</div></div>
+              <div class="space-item"><div class="space-bar" style="width:12px;height:12px"></div><div class="space-label">12</div></div>
+              <div class="space-item"><div class="space-bar" style="width:16px;height:16px"></div><div class="space-label">16</div></div>
+              <div class="space-item"><div class="space-bar" style="width:20px;height:20px"></div><div class="space-label">20</div></div>
+              <div class="space-item"><div class="space-bar" style="width:24px;height:24px"></div><div class="space-label">24</div></div>
+              <div class="space-item"><div class="space-bar" style="width:32px;height:32px"></div><div class="space-label">32</div></div>
+            </div>
+          </div></div>
+        </section>
+
+        <section class="section" id="elevation">
+          <p class="section-kicker">04 · Elevation</p>
+          <h2 class="section-title">阴影与深度</h2>
+          <p class="section-lead">数据表保持扁平；卡片与对话框使用轻阴影区分层级，避免大阴影堆砌。</p>
+          <div class="panel"><div class="panel-bd"><div class="elev-grid">
+            <div class="elev-box elev-flat">Flat · 表格内</div>
+            <div class="elev-box elev-low">Low · 卡片</div>
+            <div class="elev-box elev-mid">Medium · 下拉</div>
+            <div class="elev-box elev-high">High · 对话框</div>
+          </div></div></div>
+        </section>
+
+        <section class="section" id="buttons">
+          <p class="section-kicker">05 · Buttons</p>
+          <h2 class="section-title">按钮态</h2>
+          <p class="section-lead">整页仅保留一个「渐变」级最强 CTA；其余主操作使用实心主色按钮即可。</p>
+          <div class="panel">
+            <div class="panel-hd"><span class="panel-title">尺寸与状态</span><span class="panel-meta">hover 为示意</span></div>
+            <div class="panel-bd">
+              <p class="muted" style="margin-bottom:12px">默认 / 小 / 大</p>
+              <div class="btn-row" style="margin-bottom:16px">
+                <span class="btn btn-primary">保存</span>
+                <span class="btn btn-primary btn-sm">保存</span>
+                <span class="btn btn-primary btn-lg">发布模板</span>
+              </div>
+              <p class="muted" style="margin-bottom:12px">线框 · 文字 · 渐变 · 禁用</p>
+              <div class="btn-row">
+                <span class="btn btn-default">取消</span>
+                <span class="btn btn-ghost">查看文档</span>
+                <span class="btn btn-gradient">创建空间</span>
+                <span class="btn btn-primary" disabled>禁用</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="forms">
+          <p class="section-kicker">06 · Forms</p>
+          <h2 class="section-title">表单字段</h2>
+          <p class="section-lead">聚焦环与主色一致；错误态单独使用危险色边框与辅助说明。</p>
+          <div class="panel"><div class="panel-bd">
+            <div class="form-grid">
+              <div class="field"><label><span class="req">*</span>空间名称</label><input type="text" placeholder="请输入名称" value="生产文档库" /></div>
+              <div class="field"><label>文件类型</label><select><option>Word</option><option>PDF</option></select></div>
+              <div class="field is-error"><label>数据源 URL</label><input type="text" value="http://" /><div class="field-hint">地址格式不正确</div></div>
+            </div>
+          </div></div>
+        </section>
+
+        <section class="section" id="tags">
+          <p class="section-kicker">07 · Tags</p>
+          <h2 class="section-title">标签与状态</h2>
+          <div class="panel"><div class="panel-bd"><div class="tags">
+            <span class="tag tag-primary">启用</span>
+            <span class="tag tag-success">已同步</span>
+            <span class="tag tag-warn">待配置</span>
+            <span class="tag tag-danger">失败</span>
+            <span class="tag tag-neutral">草稿</span>
+          </div></div></div>
+        </section>
+
+        <section class="section" id="cards">
+          <p class="section-kicker">08 · Metrics</p>
+          <h2 class="section-title">指标卡片</h2>
+          <p class="section-lead">数字使用等宽数字特性，便于纵向对比扫描。</p>
+          <div class="panel"><div class="panel-bd"><div class="stat-grid">
+            <div class="stat-card"><div class="stat-label">模板总数</div><div class="stat-value accent">128</div><div class="stat-foot">较上周 +12</div></div>
+            <div class="stat-card"><div class="stat-label">今日生成</div><div class="stat-value">1,024</div><div class="stat-foot">成功率 99.2%</div></div>
+            <div class="stat-card"><div class="stat-label">队列延迟</div><div class="stat-value">240 ms</div><div class="stat-foot">P95 · 内网</div></div>
+          </div></div></div>
+        </section>
+
+        <section class="section" id="data">
+          <p class="section-kicker">09 · Data table</p>
+          <h2 class="section-title">列表与分页</h2>
+          <p class="section-lead">静态还原 <code class="inline">src/views/user/index.vue</code>：<code class="inline">Card</code>（<code class="inline">common-card</code>）+ 左侧按钮区 + 右侧 <code class="inline">Condition</code> 行内筛选；表格对应 <code class="inline">el-table</code> 与 <code class="inline">src/element-rewrite.less</code>（12px、表头 <code class="inline">#f5f7fa</code>、表头字 <code class="inline">#909399</code>、偶数行斑马纹）；底部分页对应 <code class="inline">k-pagination</code> 且 <code class="inline">background=false</code> 时透明底。</p>
+          <div class="common-card">
+            <div class="common-card__header flex-box">
+              <div class="list-toolbar-btns">
+                <span class="ep-btn ep-btn-primary">新增</span>
+                <span class="ep-btn ep-btn-default">批量操作<span class="ep-caret">▼</span></span>
+              </div>
+              <div class="condition-row" aria-label="筛选区（对齐 Condition 行内表单）">
+                <div class="condition-select-mock">全部状态</div>
+                <div class="condition-input-mock">请输入姓名/账号</div>
+                <span class="ep-btn ep-btn-primary" style="height:32px;padding:0 15px">搜索</span>
+                <span class="ep-btn ep-btn-default" style="height:32px;padding:0 15px">重置</span>
+              </div>
+            </div>
+            <div class="common-card__table">
+              <div class="docflow-table-shell">
+                <table class="docflow-table">
+                  <thead>
+                    <tr>
+                      <th class="col-cb"><span class="cb-mock" aria-hidden="true"></span></th>
+                      <th>姓名</th>
+                      <th>启用状态</th>
+                      <th>账号</th>
+                      <th>角色</th>
+                      <th style="width:180px">创建时间</th>
+                      <th>备注</th>
+                      <th style="width:180px">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td class="col-cb"><span class="cb-mock is-on" aria-hidden="true"></span></td>
+                      <td>张三</td>
+                      <td><span class="switch-mock on" title="启用"></span></td>
+                      <td>zhangsan@corp.local</td>
+                      <td>管理员</td>
+                      <td>2026-04-10 10:23:18</td>
+                      <td>—</td>
+                      <td>
+                        <div class="operation-wrap">
+                          <span class="el-link-mock">编辑</span>
+                          <span class="el-link-mock is-disabled">删除</span>
+                          <span class="el-link-mock">更多操作<span class="ep-caret">▼</span></span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="col-cb"><span class="cb-mock" aria-hidden="true"></span></td>
+                      <td>李四</td>
+                      <td><span class="switch-mock" title="停用"></span></td>
+                      <td>lisi@corp.local</td>
+                      <td>成员</td>
+                      <td>2026-04-09 16:01:42</td>
+                      <td>仅只读空间</td>
+                      <td>
+                        <div class="operation-wrap">
+                          <span class="el-link-mock">编辑</span>
+                          <span class="el-link-mock">删除</span>
+                          <span class="el-link-mock">更多操作<span class="ep-caret">▼</span></span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="col-cb"><span class="cb-mock is-on" aria-hidden="true"></span></td>
+                      <td>王五</td>
+                      <td><span class="switch-mock on" title="启用"></span></td>
+                      <td>wangwu@corp.local</td>
+                      <td>—</td>
+                      <td>2026-04-08 09:12:00</td>
+                      <td>—</td>
+                      <td>
+                        <div class="operation-wrap">
+                          <span class="el-link-mock">编辑</span>
+                          <span class="el-link-mock">删除</span>
+                          <span class="el-link-mock">更多操作<span class="ep-caret">▼</span></span>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td class="col-cb"><span class="cb-mock" aria-hidden="true"></span></td>
+                      <td>
+                        <span class="user-name-mock">赵六</span>
+                        <span class="kdx-link-mock" title="待激活（实际页为 iconfont kdx-link）">🔗</span>
+                      </td>
+                      <td><span class="switch-mock" title="停用"></span></td>
+                      <td>zhaoliu@corp.local</td>
+                      <td>成员</td>
+                      <td>2026-04-01 14:00:05</td>
+                      <td>待激活</td>
+                      <td>
+                        <div class="operation-wrap">
+                          <span class="el-link-mock">编辑</span>
+                          <span class="el-link-mock">删除</span>
+                          <span class="el-link-mock">更多操作<span class="ep-caret">▼</span></span>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="k-table-pagination justify-flex-end">
+                <div class="ep-pagination-mock" aria-label="分页（对齐 k-pagination + el-pagination）">
+                  <span>共 4 条</span>
+                  <span class="sep">|</span>
+                  <span class="ep-select-mock">10条/页</span>
+                  <span class="sep">|</span>
+                  <span class="ep-page-arrow">‹</span>
+                  <span class="ep-page-num is-active">1</span>
+                  <span class="ep-page-arrow">›</span>
+                  <span class="sep">|</span>
+                  <span>前往</span>
+                  <span class="ep-select-mock" style="width:40px;text-align:center">1</span>
+                  <span>页</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="muted" style="margin-top:14px">「启用状态」列为示意开关；真实页为 <code class="inline">el-switch</code>。「启用 / 停用」文案列若使用 <code class="inline">statusMap</code>，点为 <code class="inline">.common-status-icon.status-success / .status-cancel</code>，与 <code class="inline">user/index.vue</code> 一致。</p>
+        </section>
+
+        <section class="section" id="navigation">
+          <p class="section-kicker">10 · Navigation</p>
+          <h2 class="section-title">标签页与面包屑</h2>
+          <div class="panel"><div class="panel-bd">
+            <div class="breadcrumb">空间管理 <span>/</span> 模板配置 <span>/</span> <span>字段映射</span></div>
+            <div class="tabs">
+              <span class="tab is-active">基础信息</span>
+              <span class="tab">数据源</span>
+              <span class="tab">权限</span>
+              <span class="tab">审计日志</span>
+            </div>
+            <p class="muted">当前标签下内容区保持 12px 正文与统一行高，避免与表格页混用不同字号基准。</p>
+          </div></div>
+        </section>
+
+        <section class="section" id="feedback">
+          <p class="section-kicker">11 · Feedback</p>
+          <h2 class="section-title">提示条</h2>
+          <div class="panel"><div class="panel-bd">
+            <div class="alert alert-info"><strong>提示</strong> — 私有化环境下对象存储 endpoint 由配置文件注入，代码中勿硬编码公网地址。</div>
+            <div class="alert alert-warn"><strong>注意</strong> — 修改模板将影响已关联的生成任务，请先确认影响范围。</div>
+          </div></div>
+        </section>
+
+        <section class="section" id="modal">
+          <p class="section-kicker">12 · Modal</p>
+          <h2 class="section-title">对话框层次</h2>
+          <p class="section-lead">标题色与项目内 <code class="inline">el-dialog</code> 覆盖一致；主按钮在右、次按钮在左。</p>
+          <div class="dialog-mock">
+            <div class="dialog-mock-hd">删除模板</div>
+            <div class="dialog-mock-bd">删除后不可恢复，已排队的任务将被取消。是否继续？</div>
+            <div class="dialog-mock-ft">
+              <span class="btn btn-default">取消</span>
+              <span class="btn btn-primary">确认删除</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="refs">
+          <p class="section-kicker">13 · Reference</p>
+          <h2 class="section-title">设计文档</h2>
+          <p class="section-lead">规范以 Markdown 为单一说明源；实现时对照 Less 与 Element 覆盖。</p>
+          <div class="panel"><div class="panel-bd">
+            <div class="btn-row">
+              <a class="btn btn-primary" href="./DESIGN.md" style="text-decoration:none;color:#fff">DESIGN.md</a>
+              <a class="btn btn-default" href="./TOKENS.md" style="text-decoration:none;color:inherit">TOKENS.md</a>
+              <a class="btn btn-default" href="./README.md" style="text-decoration:none;color:inherit">README.md</a>
+            </div>
+          </div></div>
+        </section>
+
+      </div>
+
+      <nav class="toc" aria-label="页面内锚点">
+        <div class="toc-title">On this page</div>
+        <a href="#intro">概览</a>
+        <a href="#colors">色板</a>
+        <a href="#typography">排版</a>
+        <a href="#spacing">间距</a>
+        <a href="#elevation">阴影</a>
+        <a href="#buttons">按钮</a>
+        <a href="#forms">表单</a>
+        <a href="#tags">标签</a>
+        <a href="#cards">指标卡</a>
+        <a href="#data">数据表</a>
+        <a href="#navigation">导航</a>
+        <a href="#feedback">反馈</a>
+        <a href="#modal">对话框</a>
+        <a href="#refs">文档</a>
+      </nav>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var sections = [].slice.call(document.querySelectorAll('.section[id]'));
+  var links = [].slice.call(document.querySelectorAll('.sidebar-nav a[href^="#"]'));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute('href').slice(1)] = a; });
+  function absTop(el) {
+    return el.getBoundingClientRect().top + (window.scrollY || document.documentElement.scrollTop);
+  }
+  function setActive() {
+    var scrollY = window.scrollY || document.documentElement.scrollTop;
+    var probe = scrollY + 100;
+    var activeId = sections[0] ? sections[0].id : null;
+    sections.forEach(function (sec) {
+      if (absTop(sec) <= probe) activeId = sec.id;
+    });
+    links.forEach(function (a) { a.classList.remove('is-active'); });
+    if (activeId && map[activeId]) map[activeId].classList.add('is-active');
+  }
+  window.addEventListener('scroll', setActive, { passive: true });
+  setActive();
+})();
+</script>
+</body>
+</html>

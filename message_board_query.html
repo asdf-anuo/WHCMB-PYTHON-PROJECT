@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>武汉城市留言板 - 留言查询</title>
+    <!-- Element Plus CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/element-plus@2.9.1/dist/index.css"
+    />
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <!-- Element Plus -->
+    <script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"></script>
+    <!-- Element Plus Icons -->
+    <script src="https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
+    <!-- dayjs for date formatting -->
+    <script src="https://unpkg.com/dayjs@1.11.13/dayjs.min.js"></script>
+    <style>
+      /* ===== Design Token Reset (aligned with DESIGN.md & TOKENS.md) ===== */
+      :root {
+        --ep-primary: #3865f4;
+        --ep-primary-hover: #5a7ff7;
+        --ep-primary-plain: #eef2ff;
+        --ep-primary-border: #ccd8fe;
+        --ep-text: #303133;
+        --ep-text-secondary: #909399;
+        --ep-text-placeholder: #a8abb2;
+        --ep-surface: #ffffff;
+        --ep-surface-alt: #f5f7fa;
+        --ep-page-bg: #f0f2f5;
+        --ep-border: #e4e8ef;
+        --ep-border-light: #ebeef5;
+        --ep-success: #36b42a;
+        --ep-warning: #ff9a05;
+        --ep-danger: #f56c6c;
+        --ep-shadow-card: 0px 0px 5px rgba(0, 0, 0, 0.08);
+        --ep-radius: 4px;
+        --ep-navbar-h: 48px;
+        --ep-sidebar-w: 210px;
+        --ep-font-sans:
+          -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei",
+          "Segoe UI", Roboto, Arial, sans-serif;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      html {
+        font-size: 12px;
+      }
+
+      body {
+        font-family: var(--ep-font-sans);
+        font-size: 12px;
+        color: var(--ep-text);
+        background: var(--ep-page-bg);
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+      }
+
+      /* ===== Top Navigation Bar ===== */
+      .topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--ep-navbar-h);
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--ep-border-light);
+        box-shadow:
+          0 1px 0 rgba(0, 0, 0, 0.04),
+          0 4px 24px rgba(0, 0, 0, 0.06);
+        display: flex;
+        align-items: center;
+        padding: 0 20px 0 16px;
+        z-index: 1100;
+        gap: 12px;
+      }
+      .topbar-mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        background: linear-gradient(
+          108.75deg,
+          rgba(87, 182, 255, 0.8) 0%,
+          rgba(51, 124, 255, 0.8) 45.74%,
+          rgba(85, 70, 255, 0.8) 98.5%
+        );
+        flex-shrink: 0;
+        box-shadow: 0 2px 8px rgba(56, 101, 244, 0.25);
+      }
+      .topbar-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        line-height: 1.2;
+      }
+      .topbar-title {
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+        color: var(--ep-text);
+      }
+      .topbar-sub {
+        font-size: 11px;
+        color: var(--ep-text-secondary);
+        font-weight: 400;
+      }
+      .topbar-spacer {
+        flex: 1;
+      }
+
+      /* ===== Content Area ===== */
+      .page-container {
+        padding-top: calc(var(--ep-navbar-h) + 24px);
+        padding-left: 32px;
+        padding-right: 32px;
+        padding-bottom: 48px;
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      /* ===== Common Card (from design spec) ===== */
+      .common-card {
+        background: var(--ep-surface);
+        box-shadow: var(--ep-shadow-card);
+        border-radius: var(--ep-radius);
+        padding: 24px;
+        box-sizing: border-box;
+        margin-bottom: 16px;
+      }
+
+      .common-card__header.flex-box {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 12px 16px;
+        margin-bottom: 16px;
+      }
+
+      /* ===== Search Form Area ===== */
+      .search-area {
+        margin-bottom: 16px;
+      }
+
+      .search-form {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        gap: 12px 16px;
+      }
+
+      .search-form .el-form-item {
+        margin-bottom: 0;
+      }
+
+      .search-form .el-form-item__label {
+        font-size: 12px;
+        color: var(--ep-text);
+      }
+
+      .search-form .el-date-editor--daterange {
+        width: 340px;
+      }
+
+      .search-form .el-input {
+        width: 260px;
+      }
+
+      .search-btns {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 0;
+      }
+
+      /* ===== Toolbar ===== */
+      .toolbar-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+      }
+
+      .toolbar-left {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--ep-text);
+      }
+
+      .toolbar-right {
+        display: flex;
+        gap: 8px;
+      }
+
+      /* ===== Table (aligned with element-rewrite.less) ===== */
+      .common-card__table {
+        width: 100%;
+        overflow-x: auto;
+      }
+
+      /* Override Element Plus table styles to match design spec */
+      .el-table {
+        font-size: 12px !important;
+        --el-table-header-bg-color: #f5f7fa !important;
+        --el-table-header-text-color: #909399 !important;
+        --el-table-text-color: #606266 !important;
+        --el-table-border-color: #ebeef5 !important;
+        --el-table-row-hover-bg-color: #f5f7fa !important;
+        --el-table-current-row-bg-color: #eef2ff !important;
+      }
+
+      .el-table th.el-table__cell {
+        font-weight: 500;
+        font-size: 12px !important;
+        color: #909399 !important;
+        background: #f5f7fa !important;
+      }
+
+      .el-table td.el-table__cell {
+        font-size: 12px !important;
+      }
+
+      /* Zebra striping */
+      .el-table--striped
+        .el-table__body
+        tr.el-table__row--striped
+        td.el-table__cell {
+        background: #f5f7fa !important;
+      }
+
+      /* Content column: line clamp for long text */
+      .cell-content {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.6;
+        max-height: 58px;
+      }
+
+      .cell-content.is-expanded {
+        -webkit-line-clamp: unset;
+        max-height: none;
+      }
+
+      .content-expand-btn {
+        color: var(--ep-primary);
+        cursor: pointer;
+        font-size: 12px;
+        margin-left: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .content-expand-btn:hover {
+        text-decoration: underline;
+      }
+
+      .content-cell {
+        display: flex;
+        align-items: flex-start;
+      }
+
+      /* ===== Pagination (aligned with k-pagination) ===== */
+      .pagination-wrap {
+        margin-top: 16px;
+        display: flex;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 10px;
+      }
+
+      .el-pagination {
+        --el-pagination-button-bg-color: transparent !important;
+      }
+
+      /* ===== Responsive ===== */
+      @media (max-width: 960px) {
+        .page-container {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+        .search-form .el-date-editor--daterange {
+          width: 100%;
+        }
+        .search-form .el-input {
+          width: 100%;
+        }
+        .search-form {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .search-btns {
+          justify-content: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-mark" aria-hidden="true"></div>
+      <div class="topbar-brand">
+        <span class="topbar-title">武汉城市留言板查询系统</span>
+        <span class="topbar-sub"
+          >按时间范围与关键字搜索留言记录，支持导出为 XLS 文件。</span
+        >
+      </div>
+      <span class="topbar-spacer"></span>
+    </header>
+
+    <div id="app">
+      <div class="page-container">
+        <div class="common-card">
+          <!-- Search Form -->
+          <div class="search-area">
+            <el-form
+              :model="queryForm"
+              label-width="80px"
+              label-position="right"
+              class="search-form"
+              @submit.prevent="handleSearch"
+            >
+              <el-form-item label="时间范围">
+                <el-date-picker
+                  v-model="dateRange"
+                  type="daterange"
+                  range-separator="至"
+                  start-placeholder="开始日期"
+                  end-placeholder="结束日期"
+                  value-format="YYYY-MM-DD"
+                  :shortcuts="dateShortcuts"
+                  style="width: 340px"
+                  :clearable="true"
+                ></el-date-picker>
+              </el-form-item>
+              <el-form-item label="关键字">
+                <el-input
+                  v-model="queryForm.keywords"
+                  placeholder="请输入留言标题或内容关键字"
+                  clearable
+                  @keyup.enter="handleSearch"
+                ></el-input>
+              </el-form-item>
+              <div class="search-btns">
+                <el-button type="primary" :icon="Search" @click="handleSearch">
+                  查询
+                </el-button>
+                <el-button :icon="RefreshLeft" @click="handleReset">
+                  清空
+                </el-button>
+                <el-button
+                  type="success"
+                  :icon="Download"
+                  @click="handleExport"
+                  :loading="exportLoading"
+                >
+                  导出XLS
+                </el-button>
+              </div>
+            </el-form>
+          </div>
+
+          <!-- Toolbar -->
+          <!-- <div class="toolbar-row">
+            <div class="toolbar-left">查询结果</div>
+            <div class="toolbar-right">
+              <span style="font-size: 12px; color: #909399">
+                共 {{ total }} 条记录
+              </span>
+            </div>
+          </div> -->
+
+          <!-- Table -->
+          <div class="common-card__table">
+            <el-table
+              :data="tableData"
+              stripe
+              v-loading="tableLoading"
+              element-loading-text="正在加载留言数据..."
+              style="width: 100%"
+              :max-height="560"
+              :header-cell-style="{ fontSize: '14px' }"
+            >
+              <el-table-column
+                prop="subject"
+                label="留言标题"
+                min-width="220"
+                show-overflow-tooltip
+              >
+                <template #default="{ row }">
+                  <span style="color: var(--ep-primary); cursor: default"
+                    >{{ row.subject || '—' }}</span
+                  >
+                </template>
+              </el-table-column>
+              <el-table-column prop="content" label="留言内容" min-width="360">
+                <template #default="{ row }">
+                  <div class="content-cell">
+                    <span
+                      class="cell-content"
+                      :class="{ 'is-expanded': row._expanded }"
+                      >{{ row.content || '—' }}</span
+                    >
+                    <span
+                      v-if="row.content && row.content.length > 80"
+                      class="content-expand-btn"
+                      @click="row._expanded = !row._expanded"
+                      >{{ row._expanded ? '收起' : '展开' }}</span
+                    >
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column
+                prop="dateline_str"
+                label="留言时间"
+                width="170"
+                align="center"
+              >
+                <template #default="{ row }">
+                  <span>{{ row.dateline_str || '—' }}</span>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-wrap">
+            <el-pagination
+              v-model:current-page="currentPage"
+              v-model:page-size="pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="total"
+              :background="false"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handlePageChange"
+            ></el-pagination>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const { createApp, ref, reactive, onMounted, toRaw, markRaw } = Vue
+
+      const app = createApp({
+        setup() {
+          // ----- Icons (markRaw so Vue doesn't wrap them) -----
+          const Search = markRaw(ElementPlusIconsVue.Search)
+          const RefreshLeft = markRaw(ElementPlusIconsVue.RefreshLeft)
+          const Download = markRaw(ElementPlusIconsVue.Download)
+
+          // ----- Query Form -----
+          const queryForm = reactive({
+            keywords: ""
+          })
+          const dateRange = ref(null)
+
+          const dateShortcuts = [
+            {
+              text: "最近一周",
+              value: () => {
+                const end = new Date()
+                const start = new Date()
+                start.setTime(start.getTime() - 3600 * 1000 * 24 * 7)
+                return [start, end]
+              }
+            },
+            {
+              text: "最近一月",
+              value: () => {
+                const end = new Date()
+                const start = new Date()
+                start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
+                return [start, end]
+              }
+            },
+            {
+              text: "最近三月",
+              value: () => {
+                const end = new Date()
+                const start = new Date()
+                start.setTime(start.getTime() - 3600 * 1000 * 24 * 90)
+                return [start, end]
+              }
+            },
+            {
+              text: "最近半年",
+              value: () => {
+                const end = new Date()
+                const start = new Date()
+                start.setTime(start.getTime() - 3600 * 1000 * 24 * 180)
+                return [start, end]
+              }
+            },
+            {
+              text: "2026年-Q1",
+              value: () => {
+                return [new Date("2026-01-01"), new Date("2026-03-31")]
+              }
+            },
+            {
+              text: "2026年-Q2",
+              value: () => {
+                return [new Date("2026-04-01"), new Date("2026-06-30")]
+              }
+            },
+            {
+              text: "2026年-Q3",
+              value: () => {
+                return [new Date("2026-07-01"), new Date("2026-09-30")]
+              }
+            },
+            {
+              text: "2026年-Q4",
+              value: () => {
+                return [new Date("2026-10-01"), new Date("2026-12-31")]
+              }
+            },
+            {
+              text: "2025年全年",
+              value: () => {
+                return [new Date("2025-01-01"), new Date("2025-12-31")]
+              }
+            }
+          ]
+
+          // ----- Table State -----
+          const tableData = ref([])
+          const tableLoading = ref(false)
+          const total = ref(0)
+          const currentPage = ref(1)
+          const pageSize = ref(10)
+          const exportLoading = ref(false)
+
+          // ----- API Config (from config.py) -----
+          const API_URL =
+            "https://api1-liuyan.cjn.cn/messageboard/api/essearch/querySearchMapByPage"
+
+          // ----- Date to Unix Timestamp -----
+          function toTimestamp(dateStr) {
+            if (!dateStr) return ""
+            return String(
+              Math.floor(new Date(dateStr + " 00:00:00").getTime() / 1000)
+            )
+          }
+
+          // ----- Fetch Data from API (server-side pagination) -----
+          async function fetchData(page, size) {
+            tableLoading.value = true
+            try {
+              const startTime =
+                dateRange.value && dateRange.value[0]
+                  ? toTimestamp(dateRange.value[0])
+                  : ""
+              const endTime =
+                dateRange.value && dateRange.value[1]
+                  ? toTimestamp(dateRange.value[1])
+                  : ""
+
+              const form = new URLSearchParams()
+              form.append("pageNum", String(page || currentPage.value))
+              form.append("pageSize", String(size || pageSize.value))
+              form.append("tid", "")
+              form.append("queryCode", "")
+              form.append("fid", "")
+              form.append("startTime", startTime)
+              form.append("endTime", endTime)
+              form.append("nickName", "")
+              form.append("keywords", queryForm.keywords)
+
+              const resp = await fetch(API_URL, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: form.toString()
+              })
+
+              if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+
+              const json = await resp.json()
+
+              if (json.code !== 0) {
+                ElementPlus.ElMessage.error(json.msg || "接口请求失败")
+                tableData.value = []
+                total.value = 0
+                return
+              }
+
+              const rows = json.data?.rows || []
+              total.value = json.data?.total || 0
+
+              tableData.value = rows.map(item => {
+                const source = item.source || item
+                return {
+                  subject: source.subject || "",
+                  content: cleanText(source.content || ""),
+                  dateline_str: convertTimestamp(source.dateline),
+                  _expanded: false
+                }
+              })
+            } catch (e) {
+              console.error("Fetch error:", e)
+              ElementPlus.ElMessage.error("请求失败: " + e.message)
+              tableData.value = []
+              total.value = 0
+            } finally {
+              tableLoading.value = false
+            }
+          }
+
+          // ----- Clean Text (aligned with eur.py) -----
+          function cleanText(text) {
+            if (!text || typeof text !== "string") return text || ""
+            text = text.trim()
+            text = text.replace(/\s+/g, " ")
+            return text
+          }
+
+          // ----- Convert Timestamp (aligned with eur.py) -----
+          function convertTimestamp(ts) {
+            if (!ts) return ""
+            try {
+              const d = new Date(parseInt(ts) * 1000)
+              if (isNaN(d.getTime())) return String(ts)
+              const pad = n => String(n).padStart(2, "0")
+              return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+            } catch {
+              return String(ts)
+            }
+          }
+
+          // ----- Event Handlers -----
+          function handleSearch() {
+            currentPage.value = 1
+            fetchData(1)
+          }
+
+          function handleReset() {
+            queryForm.keywords = ""
+            dateRange.value = null
+            total.value = 0
+            tableData.value = []
+            currentPage.value = 1
+          }
+
+          function handleSizeChange(val) {
+            pageSize.value = val
+            currentPage.value = 1
+            fetchData(1, val)
+          }
+
+          function handlePageChange(val) {
+            currentPage.value = val
+            fetchData(val)
+          }
+
+          // ----- Export XLS -----
+          async function handleExport() {
+            if (tableData.value.length === 0) {
+              ElementPlus.ElMessage.warning("暂无数据可导出，请先查询数据")
+              return
+            }
+            exportLoading.value = true
+            try {
+              // Fetch all data for export by paginating through the API
+              const exportPageSize = 100
+              const totalPages = Math.ceil(total.value / exportPageSize)
+              let exportData = []
+
+              for (let page = 1; page <= totalPages; page++) {
+                const startTime =
+                  dateRange.value && dateRange.value[0]
+                    ? toTimestamp(dateRange.value[0])
+                    : ""
+                const endTime =
+                  dateRange.value && dateRange.value[1]
+                    ? toTimestamp(dateRange.value[1])
+                    : ""
+
+                const form = new URLSearchParams()
+                form.append("pageNum", String(page))
+                form.append("pageSize", String(exportPageSize))
+                form.append("tid", "")
+                form.append("queryCode", "")
+                form.append("fid", "")
+                form.append("startTime", startTime)
+                form.append("endTime", endTime)
+                form.append("nickName", "")
+                form.append("keywords", queryForm.keywords)
+
+                const resp = await fetch(API_URL, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                  },
+                  body: form.toString()
+                })
+
+                if (!resp.ok) continue
+
+                const json = await resp.json()
+                if (json.code !== 0) continue
+
+                const rows = json.data?.rows || []
+                exportData.push(
+                  ...rows.map(item => {
+                    const source = item.source || item
+                    return {
+                      subject: source.subject || "",
+                      content: cleanText(source.content || ""),
+                      dateline_str: convertTimestamp(source.dateline)
+                    }
+                  })
+                )
+              }
+
+              // Build HTML table for XLS export
+              let html =
+                '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">'
+              html +=
+                '<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>留言数据</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>'
+              html += '<body><table border="1">'
+              html +=
+                "<tr><th>留言标题</th><th>留言内容</th><th>留言时间</th></tr>"
+              exportData.forEach(row => {
+                html += "<tr>"
+                html += "<td>" + escapeHtml(row.subject) + "</td>"
+                html += "<td>" + escapeHtml(row.content) + "</td>"
+                html += "<td>" + escapeHtml(row.dateline_str) + "</td>"
+                html += "</tr>"
+              })
+              html += "</table></body></html>"
+
+              const blob = new Blob([html], {
+                type: "application/vnd.ms-excel;charset=utf-8"
+              })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement("a")
+              const dateStr = dayjs().format("YYYYMMDDHHmmss")
+              a.href = url
+              a.download = `留言数据_${dateStr}.xls`
+              document.body.appendChild(a)
+              a.click()
+              document.body.removeChild(a)
+              URL.revokeObjectURL(url)
+              ElementPlus.ElMessage.success("导出成功")
+            } catch (e) {
+              console.error("Export error:", e)
+              ElementPlus.ElMessage.error("导出失败: " + e.message)
+            } finally {
+              exportLoading.value = false
+            }
+          }
+
+          function escapeHtml(str) {
+            if (!str) return ""
+            return String(str)
+              .replace(/&/g, "&amp;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;")
+          }
+
+          return {
+            Search,
+            RefreshLeft,
+            Download,
+            queryForm,
+            dateRange,
+            dateShortcuts,
+            tableData,
+            tableLoading,
+            total,
+            currentPage,
+            pageSize,
+            exportLoading,
+            handleSearch,
+            handleReset,
+            handleSizeChange,
+            handlePageChange,
+            handleExport
+          }
+        }
+      })
+
+      // Register all Element Plus icons
+      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+        app.component(key, component)
+      }
+
+      app.use(ElementPlus)
+      app.mount("#app")
+    </script>
+  </body>
+</html>
