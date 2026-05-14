@@ -123,10 +123,10 @@
       /* ===== Content Area ===== */
       .page-container {
         padding-top: calc(var(--ep-navbar-h) + 24px);
-        padding-left: 32px;
-        padding-right: 32px;
-        padding-bottom: 48px;
-        max-width: 1400px;
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-bottom: 8px;
+        max-width: 1600px;
         margin: 0 auto;
       }
 
@@ -135,9 +135,9 @@
         background: var(--ep-surface);
         box-shadow: var(--ep-shadow-card);
         border-radius: var(--ep-radius);
-        padding: 24px;
+        padding: 12px;
         box-sizing: border-box;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
       }
 
       .common-card__header.flex-box {
@@ -190,7 +190,7 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 16px;
+        margin-bottom: 8px;
         flex-wrap: wrap;
         gap: 8px 16px;
       }
@@ -216,7 +216,7 @@
       .el-table {
         font-size: 12px !important;
         --el-table-header-bg-color: #f5f7fa !important;
-        --el-table-header-text-color: #909399 !important;
+        --el-table-header-text-color: #303133 !important;
         --el-table-text-color: #606266 !important;
         --el-table-border-color: #ebeef5 !important;
         --el-table-row-hover-bg-color: #f5f7fa !important;
@@ -224,9 +224,9 @@
       }
 
       .el-table th.el-table__cell {
-        font-weight: 500;
+        font-weight: 700;
         font-size: 12px !important;
-        color: #909399 !important;
+        color: #303133 !important;
         background: #f5f7fa !important;
       }
 
@@ -273,6 +273,15 @@
       .content-cell {
         display: flex;
         align-items: flex-start;
+      }
+
+      .cell-content a {
+        color: var(--ep-primary);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .cell-content a:hover {
+        color: var(--ep-primary-hover);
       }
 
       /* ===== Pagination (aligned with k-pagination) ===== */
@@ -327,6 +336,7 @@
       <div class="page-container">
         <div class="common-card">
           <!-- Search Form -->
+          <div class="toolbar-left">查询条件</div>
           <div class="search-area">
             <el-form
               :model="queryForm"
@@ -375,15 +385,14 @@
             </el-form>
           </div>
 
-          <!-- Toolbar -->
-          <!-- <div class="toolbar-row">
+          <div class="toolbar-row">
             <div class="toolbar-left">查询结果</div>
             <div class="toolbar-right">
               <span style="font-size: 12px; color: #909399">
                 共 {{ total }} 条记录
               </span>
             </div>
-          </div> -->
+          </div>
 
           <!-- Table -->
           <div class="common-card__table">
@@ -393,8 +402,8 @@
               v-loading="tableLoading"
               element-loading-text="正在加载留言数据..."
               style="width: 100%"
-              :max-height="560"
-              :header-cell-style="{ fontSize: '14px' }"
+              :max-height="tableMaxHeight"
+              :header-cell-style="{ fontSize: '14px', fontWeight: '700', color: '#303133' }"
             >
               <el-table-column
                 prop="subject"
@@ -403,9 +412,9 @@
                 show-overflow-tooltip
               >
                 <template #default="{ row }">
-                  <span style="color: var(--ep-primary); cursor: default"
-                    >{{ row.subject || '—' }}</span
-                  >
+                  <span style="color: var(--ep-primary); cursor: default">
+                    {{ row.subject || '—' }}
+                  </span>
                 </template>
               </el-table-column>
               <el-table-column prop="content" label="留言内容" min-width="360">
@@ -414,14 +423,15 @@
                     <span
                       class="cell-content"
                       :class="{ 'is-expanded': row._expanded }"
-                      >{{ row.content || '—' }}</span
-                    >
+                      v-html="row.content || '—'"
+                    ></span>
                     <span
-                      v-if="row.content && row.content.length > 80"
+                      v-if="row._needExpand"
                       class="content-expand-btn"
                       @click="row._expanded = !row._expanded"
-                      >{{ row._expanded ? '收起' : '展开' }}</span
                     >
+                      {{ row._expanded ? '收起' : '展开' }}
+                    </span>
                   </div>
                 </template>
               </el-table-column>
@@ -545,8 +555,18 @@
           const tableLoading = ref(false)
           const total = ref(0)
           const currentPage = ref(1)
-          const pageSize = ref(10)
+          const pageSize = ref(20)
           const exportLoading = ref(false)
+          const tableMaxHeight = ref(560)
+
+          // ----- Dynamic table height: fill viewport below toolbar -----
+          function calcTableHeight() {
+            const vh = window.innerHeight
+            // navbar 48 + page padding-top 24 + search area ~56 + toolbar 32 + pagination 40 + bottom margin 24
+            tableMaxHeight.value = Math.max(200, vh - 266)
+          }
+          calcTableHeight()
+          window.addEventListener("resize", calcTableHeight)
 
           // ----- API Config (from config.py) -----
           const API_URL =
@@ -610,9 +630,10 @@
                 const source = item.source || item
                 return {
                   subject: source.subject || "",
-                  content: cleanText(source.content || ""),
+                  content: renderContent(source.content || ""),
                   dateline_str: convertTimestamp(source.dateline),
-                  _expanded: false
+                  _expanded: false,
+                  _needExpand: (source.content || "").length > 80
                 }
               })
             } catch (e) {
@@ -625,11 +646,45 @@
             }
           }
 
-          // ----- Clean Text (aligned with eur.py) -----
-          function cleanText(text) {
+          // ----- Render Content: sanitize HTML + linkify URLs -----
+          function renderContent(text) {
             if (!text || typeof text !== "string") return text || ""
             text = text.trim()
-            text = text.replace(/\s+/g, " ")
+            // Decode escaped HTML entities that should be rendered
+            // e.g. "&lt;br&gt;" → "<br>", "&amp;nbsp;" → "&nbsp;" (then browser renders it)
+            text = text.replace(
+              /&lt;(\/?)(br|p|b|i|u|em|strong|span|div|ul|ol|li|h[1-6])\s*&gt;/gi,
+              "<$1$2>"
+            )
+            text = text.replace(
+              /&lt;(\/?)(br|p|b|i|u|em|strong|span|div|ul|ol|li|h[1-6])\s+([^&]*)&gt;/gi,
+              "<$1$2 $3>"
+            )
+            text = text.replace(/&amp;nbsp;/gi, "&nbsp;")
+            // Remove dangerous tags but keep safe formatting tags
+            text = text.replace(
+              /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
+              ""
+            )
+            text = text.replace(
+              /<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi,
+              ""
+            )
+            text = text.replace(
+              /<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi,
+              ""
+            )
+            text = text.replace(/<embed\b[^>]*>/gi, "")
+            text = text.replace(
+              /<form\b[^<]*(?:(?!<\/form>)<[^<]*)*<\/form>/gi,
+              ""
+            )
+            text = text.replace(/\bon\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)/gi, "")
+            // Convert plain URLs to clickable links
+            text = text.replace(
+              /(https?:\/\/[^\s<"'()]+)/g,
+              '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>'
+            )
             return text
           }
 
@@ -724,7 +779,7 @@
                     const source = item.source || item
                     return {
                       subject: source.subject || "",
-                      content: cleanText(source.content || ""),
+                      content: renderContent(source.content || ""),
                       dateline_str: convertTimestamp(source.dateline)
                     }
                   })
@@ -742,7 +797,8 @@
               exportData.forEach(row => {
                 html += "<tr>"
                 html += "<td>" + escapeHtml(row.subject) + "</td>"
-                html += "<td>" + escapeHtml(row.content) + "</td>"
+                html +=
+                  "<td>" + escapeHtml(stripHtmlTags(row.content)) + "</td>"
                 html += "<td>" + escapeHtml(row.dateline_str) + "</td>"
                 html += "</tr>"
               })
@@ -769,6 +825,23 @@
             }
           }
 
+          function stripHtmlTags(html) {
+            if (!html) return ""
+            // Replace <br> tags with newlines for XLS readability
+            let text = String(html).replace(/<br\s*\/?>/gi, "\n")
+            // Replace <a> tags with just the URL text
+            text = text.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, "$2")
+            // Remove all remaining HTML tags
+            text = text.replace(/<[^>]+>/g, "")
+            // Decode common HTML entities
+            text = text.replace(/&nbsp;/g, " ")
+            text = text.replace(/&amp;/g, "&")
+            text = text.replace(/&lt;/g, "<")
+            text = text.replace(/&gt;/g, ">")
+            text = text.replace(/&quot;/g, '"')
+            return text
+          }
+
           function escapeHtml(str) {
             if (!str) return ""
             return String(str)
@@ -791,6 +864,7 @@
             currentPage,
             pageSize,
             exportLoading,
+            tableMaxHeight,
             handleSearch,
             handleReset,
             handleSizeChange,
