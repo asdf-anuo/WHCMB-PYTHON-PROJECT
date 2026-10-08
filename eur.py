@@ -4,10 +4,13 @@ import pandas as pd
 import requests
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import time
 import random
 import config  # 导入配置文件
+
+# 留言时间按东八区展示，避免运行环境时区把日期记错
+CHINA_TZ = timezone(timedelta(hours=8))
 
 # openpyxl 不允许写入这些控制字符，超长单元格也会失败
 _ILLEGAL_EXCEL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
@@ -48,12 +51,11 @@ def clean_text(text):
 
 
 def convert_timestamp(timestamp):
-    """将时间戳转换为日期时间字符串"""
+    """将时间戳转换为东八区日期时间字符串"""
     if not timestamp:
         return ""
     try:
-        # 假设 timestamp 是秒级时间戳
-        dt = datetime.fromtimestamp(int(timestamp))
+        dt = datetime.fromtimestamp(int(timestamp), CHINA_TZ)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except (ValueError, TypeError):
         return str(timestamp)
@@ -253,7 +255,7 @@ class WuhanCommentsCrawler:
             
             # 添加元数据
             source['keyword'] = keyword
-            source['crawl_time'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            source['crawl_time'] = datetime.now(CHINA_TZ).strftime("%Y-%m-%d %H:%M:%S")
             
             # 只保留需要的字段
             filtered_source = filter_fields(source)
