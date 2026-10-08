@@ -3,10 +3,25 @@ import json
 import pandas as pd
 import requests
 import os
+import re
 from datetime import datetime
 import time
 import random
 import config  # 导入配置文件
+
+# openpyxl 不允许写入这些控制字符，超长单元格也会失败
+_ILLEGAL_EXCEL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def excel_cell(value):
+    """整理成 Excel 可接受的单元格文本"""
+    if value is None:
+        return ""
+    text = str(value)
+    text = _ILLEGAL_EXCEL_CHARS.sub("", text)
+    if len(text) > 32767:
+        text = text[:32767]
+    return text
 
 # 基础配置从 config 读取
 base_url = config.BASE_URL
@@ -44,12 +59,21 @@ def convert_timestamp(timestamp):
         return str(timestamp)
 
 
+def normalize_field_value(value):
+    """把接口字段转成可写入表格的值"""
+    if value is None:
+        return ""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    return value
+
+
 def filter_fields(source_data):
     """只保留需要的字段"""
     filtered_data = {}
     for field in config.KEEP_FIELDS:
         if field in source_data:
-            filtered_data[field] = source_data[field]
+            filtered_data[field] = normalize_field_value(source_data[field])
         elif field == "dateline_str":
             # 特殊处理：转换时间戳
             filtered_data[field] = convert_timestamp(source_data.get("dateline"))
@@ -145,26 +169,33 @@ class WuhanCommentsCrawler:
         # 构建表单数据
         form_data = self.build_form_data(keyword, page, page_size)
         
-        try:
-            # 使用 data 参数发送表单数据
-            response = requests.post(
-                url=url,
-                headers=headers,
-                data=form_data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return response.json()
-            else:
+        last_error = None
+        for attempt in range(4):
+            try:
+                # 使用 data 参数发送表单数据
+                response = requests.post(
+                    url=url,
+                    headers=headers,
+                    data=form_data,
+                    timeout=30
+                )
+
+                if response.status_code == 200:
+                    return response.json()
+
+                last_error = f"状态码 {response.status_code}"
                 if config.VERBOSE:
-                    print(f"    请求失败，状态码: {response.status_code}")
+                    print(f"    请求失败，{last_error}")
                     print(f"    响应内容: {response.text[:200]}")
-                return None
-                
-        except requests.exceptions.RequestException as e:
-            print(f"    HTTP请求异常: {e}")
-            return None
+            except requests.exceptions.RequestException as e:
+                last_error = str(e)
+                print(f"    HTTP请求异常: {e}")
+
+            if attempt < 3:
+                time.sleep(1.5 * (attempt + 1))
+
+        print(f"    第 {page} 页重试后仍失败: {last_error}")
+        return None
     
     def deduplicate_data(self, data_list):
         """
@@ -230,22 +261,58 @@ class WuhanCommentsCrawler:
         
         return processed_data
     
-    def append_to_excel_append_mode(self, data_list, filename):
-        """追加模式保存数据（用于分批爬取，已包含去重）"""
+    def append_to_csv(self, data_list, filename):
+        """追加写入 CSV。全量结果只在结束时转成 Excel，避免反复重写大表。"""
         if not data_list:
             return
-        
-        # 先对数据进行去重
+
         unique_data = self.deduplicate_data(data_list)
-        
         if not unique_data:
             if config.VERBOSE:
                 print("    本批次数据全部重复，跳过保存")
             return
-        
+
         df_new = pd.DataFrame(unique_data)
-        df_new = df_new.astype(str)
-        
+        df_new = df_new.reindex(columns=config.KEEP_FIELDS)
+        df_new = df_new.fillna("").astype(str)
+        write_header = not os.path.exists(filename)
+        df_new.to_csv(
+            filename,
+            mode="a",
+            index=False,
+            header=write_header,
+            encoding="utf-8-sig",
+        )
+        if config.VERBOSE:
+            print(f"已追加 {len(df_new)} 条新数据到 {filename}")
+
+    def export_excel(self, csv_filename, excel_filename):
+        """把完整 CSV 一次导出为 Excel，并去掉 Excel 不支持的字符。"""
+        if not os.path.exists(csv_filename):
+            print("没有可导出的数据")
+            return
+
+        df = pd.read_csv(csv_filename, dtype=str, keep_default_na=False)
+        df = df.fillna("").astype(str)
+        df = df.map(excel_cell)
+        df.to_excel(excel_filename, index=False, engine="openpyxl")
+        print(f"Excel 已写入 {len(df)} 行: {excel_filename}")
+
+    def append_to_excel_append_mode(self, data_list, filename):
+        """兼容旧调用：小批量仍直接写 Excel。"""
+        if not data_list:
+            return
+
+        unique_data = self.deduplicate_data(data_list)
+        if not unique_data:
+            if config.VERBOSE:
+                print("    本批次数据全部重复，跳过保存")
+            return
+
+        df_new = pd.DataFrame(unique_data)
+        df_new = df_new.reindex(columns=config.KEEP_FIELDS)
+        df_new = df_new.fillna("").astype(str).map(excel_cell)
+
         if os.path.exists(filename):
             try:
                 df_existing = pd.read_excel(filename, engine='openpyxl')
@@ -302,9 +369,10 @@ class WuhanCommentsCrawler:
             print("请确保 config.py 中配置了 COOKIE_STRING 或 cookie.txt 文件存在且包含有效的Cookie")
             return
         
-        # 3. 生成文件名
+        # 3. 生成文件名。先落到 CSV，结束后再导出 Excel。
         global final_filename
         final_filename = generate_timestamp_filename(base_file_name, file_extension)
+        csv_filename = final_filename.rsplit(".", 1)[0] + ".csv"
         
         # 4. 加载已有的ID（如果文件已存在）
         self.load_existing_ids(final_filename)
@@ -323,6 +391,7 @@ class WuhanCommentsCrawler:
             print(f"{'='*40}")
             
             consecutive_empty = 0  # 连续空页计数
+            expected_total = None
             
             for page in range(1, config.MAX_PAGES + 1):
                 print(f"  正在爬取第 {page} 页...", end=" ")
@@ -333,10 +402,24 @@ class WuhanCommentsCrawler:
                 if not response_data:
                     print("请求失败")
                     consecutive_empty += 1
-                    if consecutive_empty >= 2:
-                        print("    连续2次请求失败，停止翻页")
+                    if consecutive_empty >= 5:
+                        print("    连续5次请求失败，停止翻页")
                         break
                     continue
+
+                if response_data.get("code") != 0:
+                    print(f"接口返回错误: {response_data.get('msg', '未知错误')}")
+                    consecutive_empty += 1
+                    if consecutive_empty >= 5:
+                        print("    连续5次接口错误，停止翻页")
+                        break
+                    time.sleep(random.uniform(config.MIN_DELAY, config.MAX_DELAY))
+                    continue
+
+                if expected_total is None:
+                    expected_total = (response_data.get("data") or {}).get("total")
+                    if expected_total is not None:
+                        print(f"接口总数 {expected_total}。", end=" ")
                 
                 # 处理响应数据
                 processed_data = self.process_response_data(response_data, keyword, page)
@@ -353,13 +436,17 @@ class WuhanCommentsCrawler:
                 
                 # 添加到待保存列表
                 all_data.extend(processed_data)
-                print(f"获取 {len(processed_data)} 条，累计待保存 {len(all_data)} 条")
+                print(f"获取 {len(processed_data)} 条，累计待保存 {len(all_data)} 条，已入库 {len(self.processed_ids)} 条")
                 
-                # 每500条保存一次
+                # 每500条写入 CSV，结束时再统一导出 Excel
                 if len(all_data) >= 500:
-                    self.append_to_excel_append_mode(all_data, final_filename)
-                    total_new_records += len(all_data) - (len(all_data) - len([d for d in all_data if d.get('tid') not in self.processed_ids]))
+                    self.append_to_csv(all_data, csv_filename)
+                    total_new_records += len(all_data)
                     all_data = []  # 清空已保存的数据
+
+                if expected_total and len(self.processed_ids) >= int(expected_total):
+                    print(f"    已达到接口总数 {expected_total}，停止翻页")
+                    break
                 
                 # 随机延迟
                 delay = random.uniform(config.MIN_DELAY, config.MAX_DELAY)
@@ -373,13 +460,15 @@ class WuhanCommentsCrawler:
                     print(f"\n关键词 [{keyword}] 完成，等待{config.KEYWORD_DELAY}秒后继续...")
                 time.sleep(config.KEYWORD_DELAY)
         
-        # 7. 保存剩余数据
+        # 7. 保存剩余数据，并导出 Excel
         if all_data:
-            self.append_to_excel_append_mode(all_data, final_filename)
+            self.append_to_csv(all_data, csv_filename)
+        self.export_excel(csv_filename, final_filename)
         
         # 8. 显示最终结果
         print("\n" + "=" * 60)
         print("爬虫运行完成！")
+        print(f"CSV 已保存到: {csv_filename}")
         print(f"数据已保存到: {final_filename}")
         
         # 显示统计信息
