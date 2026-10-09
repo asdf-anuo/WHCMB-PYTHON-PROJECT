@@ -16,6 +16,12 @@ CHINA_TZ = timezone(timedelta(hours=8))
 _ILLEGAL_EXCEL_CHARS = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 
+def output_columns():
+    """导出文件使用的列。未配置时保留全部字段。"""
+    fields = getattr(config, "EXPORT_FIELDS", None)
+    return list(fields) if fields else list(config.KEEP_FIELDS)
+
+
 def excel_cell(value):
     """整理成 Excel 可接受的单元格文本"""
     if value is None:
@@ -275,7 +281,7 @@ class WuhanCommentsCrawler:
             return
 
         df_new = pd.DataFrame(unique_data)
-        df_new = df_new.reindex(columns=config.KEEP_FIELDS)
+        df_new = df_new.reindex(columns=output_columns())
         df_new = df_new.fillna("").astype(str)
         write_header = not os.path.exists(filename)
         df_new.to_csv(
@@ -295,6 +301,7 @@ class WuhanCommentsCrawler:
             return
 
         df = pd.read_csv(csv_filename, dtype=str, keep_default_na=False)
+        df = df.reindex(columns=output_columns())
         df = df.fillna("").astype(str)
         df = df.map(excel_cell)
         df.to_excel(excel_filename, index=False, engine="openpyxl")
@@ -312,7 +319,7 @@ class WuhanCommentsCrawler:
             return
 
         df_new = pd.DataFrame(unique_data)
-        df_new = df_new.reindex(columns=config.KEEP_FIELDS)
+        df_new = df_new.reindex(columns=output_columns())
         df_new = df_new.fillna("").astype(str).map(excel_cell)
 
         if os.path.exists(filename):
