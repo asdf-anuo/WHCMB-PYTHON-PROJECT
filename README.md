@@ -19,14 +19,14 @@
 ## 安装步骤
 
 ### 1. 安装 Python 确保已安装 Python 3.6+，检查版本：
-python3 --version
+py --version
 
 ### 2. 在项目目录下运行以下命令安装依赖：
-python3 -m pip install --upgrade pip
-python3 -m pip install pandas requests openpyxl
+py -m pip install --upgrade pip
+py -m pip install pandas requests openpyxl
 
 # 如果下载速度慢，可使用国内镜像源：
-python3 -m pip install pandas requests openpyxl -i https://pypi.tuna.tsinghua.edu.cn/simple/
+py -m pip install pandas requests openpyxl -i https://pypi.tuna.tsinghua.edu.cn/simple/
 
 ### 3. 获取 Cookie
 打开浏览器，访问 https://liuyan.cjn.cn/
@@ -40,15 +40,15 @@ python3 -m pip install pandas requests openpyxl -i https://pypi.tuna.tsinghua.ed
 
 ### 5. 修改配置文件（可选）
 如需调整爬取参数，编辑 config.py：
-START_DATE / END_DATE：日期范围
-PAGE_SIZE：每页数据量
-MAX_PAGES：最大翻页数
-MIN_DELAY / MAX_DELAY：请求间隔时间（秒）
-KEEP_FIELDS：需要保留的字段列表
+START_DATE / END_DATE: 日期范围
+PAGE_SIZE: 每页数据量
+MAX_PAGES: 最大翻页数
+MIN_DELAY / MAX_DELAY: 请求间隔时间（秒）
+KEEP_FIELDS: 需要保留的字段列表
 
 ### 6.运行项目 
 在项目目录下执行：
-python3 start.py
+py start.py
 
 ### 7.输出结果
 运行成功后，会在当前目录生成 Excel 文件，文件名格式：wuhan_comments_YYYYMMDDHHMMSS.xlsx
